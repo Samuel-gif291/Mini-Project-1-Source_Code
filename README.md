@@ -206,31 +206,52 @@ def getMainChoice():
         else:
             choice = input('Enter a valid choice: ')
 
-def getPostChoice():
+def getPostChoice(displayPage, priviledge):
     '''
-        This function gets the user's choice from the createPost function.
+        This function gets the user's choice from the createPost function based on the page they are on.
+        Input: displaypage indicates what position options shouuld be avaliable to user based on priivildges
         Return: .lower() string of valid user choice.
     '''
     global connection, cursor
-
-    alist = ['question','answer','x', 'logout', '0', '3', '4']
-    choice = input('Enter your choice:')
+    
+    if displayPage == 'beforepost':
+        alist = ['question','x', 'logout', '0', '3']
+    else:
+        if priviledge:
+            alist = ['vote', '5', 'give', '6', 'tag', '7', 'edit', '8', 'logout', '0', 'x']
+        else:
+            alist = ['vote', '5', 'logout', '0', 'x']
+    choice = input('Enter your choice: ')
     while True:    
         if choice.lower() in alist:
             return choice.lower()
         else:
             choice = input('Enter a valid choice: ')
 
-def DisplayCreatePostOption():
+def DisplayCreatePostOption(displayPage, priviledge):
     '''
         This function displays the menu for createPost() function
+        Input: priviledge is a boolean indicating the status of the user
+        Return: None
     '''
-    border = '-'*24+'Create post page'+'-'*24
-    print(border)
-    print('What kind of post would you like to make? Must be a question or an answer>')
-    print('Type "logout" or command 0 to go back to login page>')
-    print('Type "x" to exit entire program>')
-    print('-'*len(border))
+    if displayPage == 'beforepost':
+        border = '-'*24+'Create post page'+'-'*24
+        print(border)
+        print('Enter 3 to create Question post or the command "question">')
+        print('Type "logout" or command 0 to go back to login page>')
+        print('Type "x" to exit entire program>')
+        print('-'*len(border))
+    else:
+        border = '-'*26+'Post page'+'-'*26
+        print(border)
+        print('Enter 5 or the command "vote" to vote for post >')
+        if priviledge:
+            print('Enter 6 or command "give" to give badge to user>')
+            print('Enter 7 or command "tag" to add tag to post>')
+            print('Enter 8 or command "edit" to edit post>')
+        print('Type "logout" or command 0 to go back to login page>')
+        print('Type "x" to exit entire program>') 
+        print('-'*len(border))
 
 def generatePostID():
     '''
@@ -261,13 +282,39 @@ def getPostInfo(partOfPost):
         Input: 'partOfPost' represents either title or body of post to be prompted for.
         Returns: a string containing the input title or body of post to be made.
     '''
+    global connection, cursor
+    
     if partOfPost == 'title':
         text = input('Enter title of post: ')
     else:
         text = input('Enter body of post: ')
     text = ProcessString(text)
     return text
-        
+
+def helpPostQuestion(userID):
+    '''
+        This function handles adding a post to the database.
+        Input: userID is primark key of the user making the post.
+        Returns: the postID in case neeeded.
+    '''
+    global connection, cursor
+
+    currentDate = time.strftime("%Y-%m-%d %H:%M:%S")
+    postID = generatePostID()
+    ptitle = getPostInfo('title')
+    pbody = getPostInfo('body')
+
+    query = ''' INSERT into posts VALUES (?, ?, ?, ?, ?); '''
+    cursor.execute(query, (postID, currentDate, ptitle, pbody, userID))
+    connection.commit()
+    print('Post sucessufully made!')
+    print('-'*60)
+    print('Post Details:')
+    print('Title:', ptitle)
+    print('Body:', pbody)
+    print('-'*60)
+    
+    return postID
 
 def exitProgram():
     '''
@@ -337,24 +384,24 @@ def registerUser():
 
 def createPost(userID, priviledge):
     '''
-        This function allows a user to to create either a question post or answer post.
+        This function allows a user to to create a question post.
         It can also update the login and exit variables in the main function.
         Input: userID is the unique identification for logged-in user.
+        Return: login and exit status
     '''
     global connection, cursor
     login = True; Exit = False
-    DisplayCreatePostOption()
-    choice = getPostChoice()
+    DisplayCreatePostOption('beforepost', priviledge)
+    choice = getPostChoice('beforepost', priviledge)
     
     if choice == '0' or choice == 'logout':
         login = False
     elif choice == '3' or choice == 'question':
-        postQuestion(userID, priviledge)
-    elif choice == '4' or choice == 'answer':
-        postAnswer(userID)
+        login, Exit = postQuestion(userID, priviledge)
     else:
         login = False; Exit = True
     return [login, Exit]
+    
     
 def postQuestion(userID, priviledge):
     '''
@@ -365,17 +412,27 @@ def postQuestion(userID, priviledge):
     '''
     global connection, cursor
     
-    currentDate = time.strftime("%Y-%m-%d %H:%M:%S")
-    postID = generatePostID()
-    ptitle = getPostInfo('title')
-    pbody = getPostInfo('body')
-
-    query = ''' INSERT into posts VALUES (?, ?, ?, ?, ?); '''
-    cursor.execute(query, (postID, currentDate, ptitle, pbody, userID))
-    connection.commit()
-
-    print('Post sucessufully made!')
-    print('Wou
+    login = True; Exit = False
+    postID = helpPostQuestion(userID)
+    DisplayCreatePostOption('afterpost', priviledge)
+    choice = getPostChoice('afterpost', priviledge)
+    
+    if choice == '0' or choice == 'logout':
+        login = False
+    elif choice == '3' or choice == 'question':
+        pass #postQuestion(userID, priviledge)
+    elif choice == '5' or choice == 'vote':
+        pass # add up vote to database
+    elif choice == '6' or choice == 'badge':
+        pass # give badge to userID
+    elif choice == '7' or choice == 'tag':
+        pass # get and add tag to post
+    elif choice == '8' or choice == 'edit':
+        pass # collect edit and update post with postID
+    else:
+        login = False; Exit = True
+    return [login, Exit]
+    
     
 def main():
     # Controls the life of the application while in use
