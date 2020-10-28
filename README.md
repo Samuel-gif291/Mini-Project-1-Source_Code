@@ -375,7 +375,6 @@ def postQuestion(userID, priviledge):
     connection.commit()
 
     print('Post sucessufully made!')
-    print('Wou
     
 def main():
     # Controls the life of the application while in use
