@@ -47,24 +47,6 @@ def connectPath():
             return
         except Exception as e:
             print('An error occured while connecting to database. Try again')
-        
-def privledgeUser(user_id):
-    '''
-        This function determines if a user has priviledges or not
-        Input: user_id is the primary key used to identify a user in database
-        Return: Boolean; True if user is in the privilege table and False otherwise
-    '''
-    global connection, cursor
-    pass
-   
-def display_menu(privilege):
-    '''
-        This function displays the menu to the command-line and it restricts features based on privileges
-        Input: privilege is a boolean representing status of priviledge
-        Return: None
-    '''
-    global connection, cursor
-    pass
 
 def askForRegistration():
     '''
@@ -215,12 +197,12 @@ def getPostChoice(displayPage, priviledge):
     global connection, cursor
     
     if displayPage == 'beforepost':
-        alist = ['question','x', 'logout', '0', '3']
+        alist = ['back','question','x', 'logout', '0', '3']
     else:
         if priviledge:
             alist = ['vote', '5', 'give', '6', 'tag', '7', 'edit', '8', 'logout', '0', 'x']
         else:
-            alist = ['vote', '5', 'logout', '0', 'x']
+            alist = ['back', 'vote', '5', 'logout', '0', 'x']
     choice = input('Enter your choice: ')
     while True:    
         if choice.lower() in alist:
@@ -239,6 +221,7 @@ def DisplayCreatePostOption(displayPage, priviledge):
         print(border)
         print('Enter 3 to create Question post or the command "question">')
         print('Type "logout" or command 0 to go back to login page>')
+        print('Type "back" to return to main menu>')
         print('Type "x" to exit entire program>')
         print('-'*len(border))
     else:
@@ -250,7 +233,8 @@ def DisplayCreatePostOption(displayPage, priviledge):
             print('Enter 7 or command "tag" to add tag to post>')
             print('Enter 8 or command "edit" to edit post>')
         print('Type "logout" or command 0 to go back to login page>')
-        print('Type "x" to exit entire program>') 
+        print('Type "back" to return to main menu>')
+        print('Type "x" to exit entire program>')
         print('-'*len(border))
 
 def generatePostID():
@@ -268,10 +252,8 @@ def generatePostID():
     
     num = randint(0,999)
     pid = 'p{:03d}'.format(num)
-    
     if len(allPIDs)>0:
-        largestpid = allPIDs[len(allPIDs)-1]; largestpid = largestpid[0]
-        while pid <= largestpid:
+        while (pid,) in allPIDs:
             num = randint(0,999)
             pid = 'p{:03d}'.format(num)
     return pid    
@@ -315,6 +297,240 @@ def helpPostQuestion(userID):
     print('-'*60)
     
     return postID
+
+def getSearchKey(status='placeholder'):
+    '''
+        This function allows user to input their key word for a search.
+        Input: status is a default parameter to tell if user needed to search multiple times.
+        Returns: a Processed string of user's input.
+    '''
+    if status == 'not found':
+        print('No search results...')
+        print('Try again! or type command "end" to end search> ')
+    
+    while True:
+        key = input('Enter valid search key: ')
+        key = ProcessString(key)
+        if len(key)>0:
+            return key.lower()
+
+def searchQuery(word):
+    # This function contains text for search query to database.
+    # Input: word is the basis for search results to be queried
+    # Returns: a string containing query
+    
+    query = '''
+                SELECT summary_table.pid as pid, summary_table.title as title, summary_table.body as body, summary_table.tot_votes as votes, ifnull(count(answers.pid), 0) as numAnsw
+                FROM 
+                (SELECT search_results.pid as pid, search_results.title as title, search_results.body as body, ifnull(count(votes.vno), 0) as tot_votes
+                FROM 
+                (SELECT pid as pid, title as title, body as body
+                FROM posts
+                WHERE lower(posts.title) LIKE "%{}%"
+                UNION
+                SELECT pid as pid, title as title, body as body
+                FROM posts
+                WHERE lower(posts.body) LIKE "%{}%"
+                UNION
+                SELECT p.pid as pid, p.title as title, p.body as body
+                FROM posts p, tags t
+                WHERE p.pid=t.pid AND lower(t.tag) LIKE "%{}%") search_results LEFT OUTER JOIN votes ON
+                search_results.pid=votes.pid
+                group by search_results.pid ) summary_table LEFT OUTER JOIN answers ON
+                summary_table.pid=answers.qid
+                GROUP BY summary_table.pid, summary_table.tot_votes;
+            '''.format(word, word, word)
+    return query
+
+def helpQuickSort(result, sortKey, start, end):
+    '''
+        This function is just an implementatation of quick sort.
+        Input: result is the list to be sorted in place. sortkey is dictionay of form {pid:Number_of_Keyword matches}
+        Return: None
+    '''
+    if start<end:
+      part_ind = RandomizedPartition(alist, start, end)
+      helpQuickSort(result, sortKey, start, part_ind-1)
+      helpQuickSort(result, sortKey, part_ind+1, end)
+
+def RandomizedPartition(alist, start, end):
+    '''
+     partions a list using the last item in list size as pivot --alist[end]
+     Returns: the index of item uesed to partition list.
+     Randomizes pivot
+    '''
+   
+    rand_ind = randint(start, end)
+    alist[rand_ind], alist[end] = alist[end], alist[rand_ind]
+    pivot = alist[end]
+   
+    i = start-1 # start to i represents all items < the pivot
+    j = start   # i+1 to j represents item >= pivot
+    for j in range(start, end):
+       if alist[j]<pivot:
+          i += 1
+          alist[j], alist[i] = alist[i], alist[j]
+    alist[i+1], alist[end] = alist[end], alist[i+1]
+    return i+1
+
+      
+def orderSearchResults(result, keywords):
+    '''
+        This function sorts result based on kweyword matches in title, body and tags
+        Input: result is the list to be sorted
+        Return: None
+    '''
+    global connection, cursor
+
+    sortkey = countOccurences(result, keyword) # is a dictionary
+    start, end = [0,len(result)-1]
+    helpQuickSort(result, sortkey, start, end)
+
+    
+def Searchdatabase(key):
+    '''
+        This function retrieves post that contain words in key parameter in either its title, body, or tag fields.
+        Input: key is a string representation of words provie by user in search option. num is an integer representing
+               the number of searches made.
+        Return: ...
+    '''
+    global connection, cursor
+
+    keywords = key.split(' ')
+    result = []
+    for word in keywords:
+        query = searchQuery(word)
+        cursor.execute(query)
+        result += cursor.fetchall() # may include duplicates
+    # Remove duplicates
+    unique = set(result)
+    result = list(unique)
+    connection.commit()
+    if result == []:
+        return None
+    #orderSearchResults(result, keywords) # in place sorting of result based on key matches
+    return result 
+
+def truncateString(string):
+    '''
+        This function truncates a string that is over 61 characters in length.
+        Input: string to be manipulated
+        Returns: a string
+    '''
+    if len(string) <= 61:
+        return string
+    else:
+        return string[0:59]+'...'
+    
+def displaySearchResult(result, num):
+    '''
+        This function prints to sreen the result from a user's search
+        Input: result is a list containg the posts to be displayed. num is an integer repersenting size of list to be displayee
+        Return: None
+    '''
+    global connection, cursor
+    print('Search Results:')
+    print('+'+'-'*4+'+'+'-'*61+'+'+'-'*4+'+'+'-'*3+'+')
+    print('|{:^4}|{:^61}|{:^4}|{:^3}|'.format('Post', 'Post_Title', 'Vote', 'Ans'))
+    print('+'+'-'*4+'+'+'-'*61+'+'+'-'*4+'+'+'-'*3+'+')
+    if num == 1:
+        r = min(5, len(result))
+    else:
+        r = len(result)
+    
+    for p in range(r):
+        pid = result[p][0]
+        ptitle = truncateString(result[p][1])
+        numVotes = str(result[p][3])
+        numAns = str(result[p][4])
+        print('|{:^4}|{:^61}|{:^4}|{:^3}|'.format(pid, ptitle, numVotes, numAns))
+
+    print('+'+'-'*4+'+'+'-'*61+'+'+'-'*4+'+'+'-'*3+'+')
+
+def displaySearchPageMenu(postOption):
+    '''
+        This page displays the menu for the search page.
+        Input: postoption indicates if there are post to select from or not.
+        Return: None
+    '''
+    global connection, cursor
+    border = '-'*24+'Search post page'+'-'*24
+    print(border)
+    if postOption != None:
+        print('Enter "more" to see more post>')
+        print('Type "Post_ID" to select post>')
+    print('Type "back" to go back>')
+    print('Type "logout" or command 0 to go back to login page>')
+    print('Type "x" to exit entire program>')
+    print('-'*len(border))
+        
+def getSearchChoice(postOptions):
+    '''
+        This fuction returns a valid choice from user on the search page.
+        Input: postoption indicates what is a valid input by a user
+        Return: string containing choice by user
+    '''
+    
+    global connection, cursor
+    if postOptions == None:
+        alist = [ 'back', 'logout', '0', 'x']
+    else:
+        alist = ['back', 'more', 'logout', '0', 'x']
+        for postInfo in postOptions:
+            alist.append(postInfo[0])
+    while True:
+        answer = input('Enter valid choice: ')
+        if answer.lower() in alist:
+            return answer.lower()
+
+def typeOfPost(choice):
+    '''
+        This function determines a if a post is an answer or question.
+        Input: choice is a string containing pid of post
+        Return: string of 'question' or 'answer'
+    '''
+    global connection, cursor
+    query = ''' SELECT pid FROM questions WHERE pid=?; '''
+    cursor.execute(query, (choice,))
+    temp = cursor.fetchall()
+    connection.commit()
+    if temp == []:
+        return 'answer'
+    else:
+        return 'question'
+    
+
+def helpHandleSearch(key, numSearch, priviledge):
+    '''
+        This function handles the search features of the application
+        Input: numSearch is and integer to indicate limit of search and key contains the words provided by the user.
+        Return: None or the user's choice if it is to exit or logout.
+    '''
+    global connection, cursor
+    login = True; Exit = False
+    result = Searchdatabase(key)
+    if result == None:
+        endSearch = False
+        while result == None and not endSearch:
+            key = getSearchKey('not found')
+            if key == 'end':
+                endSearch = True
+            if not endSearch:
+                result = Searchdatabase(key)
+    if key != 'end' and result != None:
+        displaySearchResult(result, numSearch)
+        displaySearchPageMenu(result)
+    else:
+        displaySearchPageMenu(None)
+    choice = getSearchChoice(result) # result is used to indicate what kind of choice is valid
+    if choice not in ['logout', '0', 'x', 'more', 'back']:
+        Type = typeOfPost(choice) # could be a question or answer returns string
+        if Type == 'question':
+            pass # can answer the question, give badge, vote, edit post or tag post based on user priviledge 
+        elif Type == 'answer':
+            pass # can indicated as accpted, give badge, vote, edit post or tag post based on user priviledge
+    else:
+        return choice
 
 def exitProgram():
     '''
@@ -408,7 +624,7 @@ def postQuestion(userID, priviledge):
         This function is collects and organizes a user's post for insertion into database. Also prompts for any other actions
         a user might want to take.
         Input: userID is primary of user making a post
-        Return: ...
+        Return: [login, Exit] status
     '''
     global connection, cursor
     
@@ -419,8 +635,8 @@ def postQuestion(userID, priviledge):
     
     if choice == '0' or choice == 'logout':
         login = False
-    elif choice == '3' or choice == 'question':
-        pass #postQuestion(userID, priviledge)
+    elif choice == '3' or choice == 'question':  # consider deleting
+        pass #login, Exit = postQuestion(userID, priviledge)
     elif choice == '5' or choice == 'vote':
         pass # add up vote to database
     elif choice == '6' or choice == 'badge':
@@ -429,10 +645,40 @@ def postQuestion(userID, priviledge):
         pass # get and add tag to post
     elif choice == '8' or choice == 'edit':
         pass # collect edit and update post with postID
+    elif choice == 'back':
+        login = True; Exit = False
     else:
         login = False; Exit = True
     return [login, Exit]
+
+def searchPost(userID, priviledge):
+    '''
+        This function handles the search option from the main function.
+        Input: userID is a string holding primary key for user, priviledge is a boolean indicating priviledge status
+        Return: [login, Exit] status
+    '''
+    global connection, cursor
+    numSearch = 1
+    login = True; Exit = False
     
+    print('-'*20+'Search Page'+'-'*20)
+    print('Enter one or more key words seperated by a blank space to search for a post> ')
+    key = getSearchKey()
+    choice = helpHandleSearch(key, numSearch, priviledge)
+
+    if choice == 'back':
+        login = True; Exit = False
+    elif choice == 'logout' or choice == '0':
+        login = False
+    elif choice == 'x':
+        login = False; Exit = True
+    elif choice == 'more':
+        choice = helpHandleSearch(key, numSearch+1, priviledge)
+        #login, Exit = searchPost(userID, priviledge)
+    return [login, Exit]
+
+
+
     
 def main():
     # Controls the life of the application while in use
@@ -453,7 +699,7 @@ def main():
             displayMainMenu()
             choice = getMainChoice()
             if choice == '1' or choice == 'search':
-                searchPost(userID)
+                login, Exit = searchPost(userID, priviledge)
             elif choice == '2' or choice == 'post':
                 login, Exit = createPost(userID, priviledge)
             elif choice == '0' or choice == 'logout':
