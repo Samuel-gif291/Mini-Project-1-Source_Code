@@ -342,6 +342,51 @@ def searchQuery(word):
             '''.format(word, word, word)
     return query
 
+def helpQuickSort(result, sortKey, start, end):
+    '''
+        This function is just an implementatation of quick sort.
+        Input: result is the list to be sorted in place. sortkey is dictionay of form {pid:Number_of_Keyword matches}
+        Return: None
+    '''
+    if start<end:
+      part_ind = RandomizedPartition(alist, start, end)
+      helpQuickSort(result, sortKey, start, part_ind-1)
+      helpQuickSort(result, sortKey, part_ind+1, end)
+
+def RandomizedPartition(alist, start, end):
+    '''
+     partions a list using the last item in list size as pivot --alist[end]
+     Returns: the index of item uesed to partition list.
+     Randomizes pivot
+    '''
+   
+    rand_ind = randint(start, end)
+    alist[rand_ind], alist[end] = alist[end], alist[rand_ind]
+    pivot = alist[end]
+   
+    i = start-1 # start to i represents all items < the pivot
+    j = start   # i+1 to j represents item >= pivot
+    for j in range(start, end):
+       if alist[j]<pivot:
+          i += 1
+          alist[j], alist[i] = alist[i], alist[j]
+    alist[i+1], alist[end] = alist[end], alist[i+1]
+    return i+1
+
+      
+def orderSearchResults(result, keywords):
+    '''
+        This function sorts result based on kweyword matches in title, body and tags
+        Input: result is the list to be sorted
+        Return: None
+    '''
+    global connection, cursor
+
+    sortkey = countOccurences(result, keyword) # is a dictionary
+    start, end = [0,len(result)-1]
+    helpQuickSort(result, sortkey, start, end)
+
+    
 def Searchdatabase(key):
     '''
         This function retrieves post that contain words in key parameter in either its title, body, or tag fields.
@@ -437,6 +482,23 @@ def getSearchChoice(postOptions):
         answer = input('Enter valid choice: ')
         if answer.lower() in alist:
             return answer.lower()
+
+def typeOfPost(choice):
+    '''
+        This function determines a if a post is an answer or question.
+        Input: choice is a string containing pid of post
+        Return: string of 'question' or 'answer'
+    '''
+    global connection, cursor
+    query = ''' SELECT pid FROM questions WHERE pid=?; '''
+    cursor.execute(query, (choice,))
+    temp = cursor.fetchall()
+    connection.commit()
+    if temp == []:
+        return 'answer'
+    else:
+        return 'question'
+    
 
 def helpHandleSearch(key, numSearch, priviledge):
     '''
