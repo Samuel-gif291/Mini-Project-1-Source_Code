@@ -2,6 +2,7 @@ import time
 import sqlite3
 import getpass
 from random import randint
+import readline
 
 connection = None
 cursor = None
@@ -717,12 +718,43 @@ def postQuestion(userID, priviledge):
     elif choice == '7' or choice == 'tag':
         pass # get and add tag to post
     elif choice == '8' or choice == 'edit':
-        pass # collect edit and update post with postID
+        privilegedEditPost(postID)
     elif choice == 'back':
         login = True; Exit = False
     else:
         login = False; Exit = True
     return [login, Exit]
+
+def rlinput(prompt, prefill=''):
+   readline.set_startup_hook(lambda: readline.insert_text(prefill))
+   try:
+      return input(prompt)
+   finally:
+      readline.set_startup_hook()
+
+def privilegedEditPost(postID):
+    '''
+    This allows the user to edit the existing title and body of the selected post
+    Input: postID is the selected post
+    Return: None
+    '''
+    global connection, cursor
+    
+    query = ''' SELECT title, body FROM posts WHERE pid = ?; '''
+    cursor.execute(query, (postID,))
+    title, body = cursor.fetchone()
+    connection.commit()
+
+    title = rlinput("Edit title: ", title)
+    body = rlinput("Edit body: ", body)
+
+    query = ''' UPDATE posts SET title = ?,body = ? WHERE pid = ? '''
+    cursor.execute(query, (title, body, postID))
+    connection.commit()
+
+    print()
+    print("The post has been updated")
+    print()
 
 def promptForBadgeName():
     '''
@@ -747,6 +779,22 @@ def promptForBadgeName():
     print()
     return chosenBname
 
+def posterHasReceivedABadgeToday(poster, currentDate):
+    '''
+    This checks if the creator of the selected post has received a badge today already
+    Input: poster is the uid of the selected post's creator, currentDate is today's date
+    Return: True if the user has voted already, False otherwise
+    '''
+    global connection, cursor
+
+    query = ''' SELECT * FROM ubadges WHERE uid = ? AND bdate = ?; '''
+    cursor.execute(query, (poster, currentDate))
+    rows = cursor.fetchall()
+    connection.commit()
+    if len(rows) == 0:
+        return False
+    return True
+
 def giveBadge(postID):
     '''
     This inserts an entry in the ubadges table for the poster associated with postID
@@ -756,17 +804,23 @@ def giveBadge(postID):
     global connection, cursor
 
     currentDate = time.strftime("%Y-%m-%d")
-    bname = promptForBadgeName()
     query = ''' SELECT poster FROM posts WHERE pid = ?; '''
     cursor.execute(query, (postID,))
     poster = cursor.fetchone()[0]
     connection.commit()
+    
+    if posterHasReceivedABadgeToday(poster, currentDate):
+        print("The creator of this post has already received a badge today!")
+        print()
+        return None
 
+    bname = promptForBadgeName()
     query = ''' INSERT INTO ubadges VALUES (?, ?, ?); '''
     cursor.execute(query, (poster, currentDate, bname))
     connection.commit()
 
-    print("The badge " + bname + " has been given to user " + poster +"!")
+    print('The badge "' + bname + '" has been given to user ' + poster +'!')
+    print()
 
 def generateVoteNumber(postID):
     '''
@@ -789,9 +843,9 @@ def generateVoteNumber(postID):
 
 def userVotedAlready(userID, postID):
     '''
-    This inserts a user's vote in the votes table for the selected post
+    This checks if the user has voted on the selected post already
     Input: userID is the primary key of the user, postID is the primary key of the selected post
-    Return: None
+    Return: True if the user has voted already, False otherwise
     '''
     global connection, cursor
 
@@ -852,7 +906,7 @@ def searchPost(userID, priviledge):
         login, Exit = searchPost(userID, priviledge)
     return [login, Exit]
 
-def editPost(userID, privledge):
+def editPost(userID):
     '''
         This function enables a priviledged user to edit any post.
         Input: userID is the primary key of the user. priviledge is a boolean indicating the administrative status of user.
