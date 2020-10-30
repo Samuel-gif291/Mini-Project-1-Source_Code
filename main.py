@@ -711,7 +711,7 @@ def postQuestion(userID, priviledge):
     elif choice == '3' or choice == 'question':  # consider deleting
         pass #login, Exit = postQuestion(userID, priviledge)
     elif choice == '5' or choice == 'vote':
-        pass # add up vote to database
+        votePost(userID, postID)
     elif choice == '6' or choice == 'badge':
         pass # give badge to userID
     elif choice == '7' or choice == 'tag':
@@ -723,6 +723,46 @@ def postQuestion(userID, priviledge):
     else:
         login = False; Exit = True
     return [login, Exit]
+
+def generateVoteNumber(postID):
+    '''
+        This generates a unique vno for the selected post in the database.
+        Input: None
+        Return: an unique integer vno for the selected post
+    '''
+    global connection, cursor
+
+    query = ''' SELECT vno FROM votes WHERE pid = ? ORDER BY vno; '''
+    cursor.execute(query, (postID,))
+    allVNOs = cursor.fetchall()
+    connection.commit()
+    
+    vno = randint(0,999)
+    if len(allVNOs)>0:
+        while (vno,) in allVNOs:
+            vno = randint(0,999)
+    return vno
+
+def votePost(userID, postID):
+    '''
+    This inserts a user's vote in the votes table for the selected post
+    Input: userID is the primary key of the user, postID is the primary key of the selected post
+    Return: None
+    '''
+    global connection, cursor
+
+    currentDate = time.strftime("%Y-%m-%d")
+    vno = generateVoteNumber(postID)
+    if vno == 0:
+        return None
+    query = ''' INSERT into votes VALUES (?, ?, ?, ?); '''
+    cursor.execute(query, (postID, vno, currentDate, userID))
+    connection.commit()
+    print('-'*60)
+    print('Your vote has been cast!')
+    print()
+    print('-'*60)
+    
 
 def searchPost(userID, priviledge):
     '''
