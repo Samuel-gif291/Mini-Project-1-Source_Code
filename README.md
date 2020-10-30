@@ -575,7 +575,6 @@ def helpHandleSearch(key, result, numSearch, priviledge):
     global connection, cursor
     login = True; Exit = False
     if numSearch == 1:
-        #result = Searchdatabase(key)
         if result == None:
             endSearch = False
             while result == None and not endSearch:
