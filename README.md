@@ -141,6 +141,7 @@ def getLoginInfo():
     
     userID = input('Enter user id: ')
     password = getpass.getpass('Enter password: ')
+    userID = ProcessString(userID).lower()
     return [userID, password]
 
 def getExitOption():
@@ -441,18 +442,22 @@ def Searchdatabase(key):
     global connection, cursor
 
     keywords = key.split(' ')
+    # Remove duplicate searches
+    temp = set(keywords)
+    keywords = list(temp)
     result = []
     for word in keywords:
         query = searchQuery(word)
         cursor.execute(query)
         result += cursor.fetchall() # may include duplicates
-    # Remove duplicates
+    # Remove duplicates results
     unique = set(result)
     result = list(unique)
     connection.commit()
     if result == []:
         return None
-    orderSearchResults(result, keywords) # in place sorting of result based on key matches
+    if len(keywords) > 1:
+        orderSearchResults(result, keywords) # in place sorting of result based on key matches
     return result 
 
 def truncateString(size, string):
