@@ -281,14 +281,18 @@ def helpPostQuestion(userID):
     '''
     global connection, cursor
 
-    currentDate = time.strftime("%Y-%m-%d %H:%M:%S")
+    #currentDate = time.strftime("%Y-%m-%d %H:%M:%S")
+    currentDate = time.strftime("%Y-%m-%d")
     postID = generatePostID()
     ptitle = getPostInfo('title')
     pbody = getPostInfo('body')
 
-    query = ''' INSERT into posts VALUES (?, ?, ?, ?, ?); '''
-    cursor.execute(query, (postID, currentDate, ptitle, pbody, userID))
+    query1 = ''' INSERT into posts VALUES (?, ?, ?, ?, ?); '''
+    query2 = ''' INSERT into questions VALUES (?, ?); '''
+    cursor.execute(query1, (postID, currentDate, ptitle, pbody, userID))
+    cursor.execute(query2, (postID, 'null'))
     connection.commit()
+    print('-'*60)
     print('Post sucessufully made!')
     print('-'*60)
     print('Post Details:')
@@ -340,7 +344,30 @@ def searchQuery(word):
                 summary_table.pid=answers.qid
                 GROUP BY summary_table.pid, summary_table.tot_votes;
             '''.format(word, word, word)
-    return query
+
+    query1 = '''SELECT summary_table.pid as pid, summary_table.title as title, summary_table.body as body, summary_table.tot_votes as votes,
+                ifnull(count(answers.pid), 0) as numAnsw, summary_table.pdate as pdate, summary_table.poster as poster
+                FROM 
+                (SELECT search_results.pid as pid, search_results.title as title, search_results.body as body, ifnull(count(votes.vno), 0) as tot_votes,
+                search_results.pdate as pdate, search_results.poster as poster
+                FROM 
+                (SELECT *
+                FROM posts
+                WHERE lower(posts.title) LIKE "%{}%"
+                UNION
+                SELECT *
+                FROM posts
+                WHERE lower(posts.body) LIKE "%{}%"
+                UNION
+                SELECT p.pid as pid, p.pdate as pdate, p.title as title, p.body as body, p.poster as poster
+                FROM posts p, tags t
+                WHERE p.pid=t.pid AND lower(t.tag) LIKE "%{}%") search_results LEFT OUTER JOIN votes ON
+                search_results.pid=votes.pid
+                group by search_results.pid ) summary_table LEFT OUTER JOIN answers ON
+                summary_table.pid=answers.qid
+                GROUP BY summary_table.pid, summary_table.tot_votes;
+        '''.format(word, word, word)
+    return query1
 
 def helpQuickSort(result, sortKey, start, end):
     '''
@@ -349,31 +376,71 @@ def helpQuickSort(result, sortKey, start, end):
         Return: None
     '''
     if start<end:
-      part_ind = RandomizedPartition(alist, start, end)
+      part_ind = RandomizedPartition(result, sortKey, start, end)
       helpQuickSort(result, sortKey, start, part_ind-1)
       helpQuickSort(result, sortKey, part_ind+1, end)
 
-def RandomizedPartition(alist, start, end):
+def RandomizedPartition(alist, sortKey, start, end):
     '''
-     partions a list using the last item in list size as pivot --alist[end]
-     Returns: the index of item uesed to partition list.
-     Randomizes pivot
+     Randomizes pivot. Partions a list using the last item in list size as pivot --alist[end]
+     Input: alist is a list containg posts. sortKey is a dictionary used as basis for sorting.
+            start is the first index of portion of list to be sorted. end is the last index of portion of list to be sorted.
+     Returns: the index of item used to partition list. Randomizes pivot
     '''
    
     rand_ind = randint(start, end)
     alist[rand_ind], alist[end] = alist[end], alist[rand_ind]
-    pivot = alist[end]
+    pivot = sortKey[alist[end][0]]
    
-    i = start-1 # start to i represents all items < the pivot
-    j = start   # i+1 to j represents item >= pivot
+    i = start-1 # start to i represents all items > the pivot
+    j = start   # i+1 to j represents item <= pivot
     for j in range(start, end):
-       if alist[j]<pivot:
+       count = sortKey[alist[j][0]]
+       if count>pivot:
           i += 1
           alist[j], alist[i] = alist[i], alist[j]
     alist[i+1], alist[end] = alist[end], alist[i+1]
     return i+1
 
-      
+def countKeyOccInTags(postID, key):
+    '''
+        This function counts the number occurences of a keyword in a tag.
+        Input: postID is a string representation of the post primary-key. Key is the string of specific keyword to be counted in tag.
+        Return: total count of occurences in a tag.
+    '''
+    global connection, cursor
+    query = ''' SELECT tag FROM posts JOIN tags ON tags.pid=posts.pid WHERE posts.pid=? '''
+    cursor.execute(query, (postID,))
+    tags = cursor.fetchall()
+    connection.commit()
+    
+    count = 0
+    if len(tags)>0:
+        for t in tags:
+            tag = t[0] 
+            count += len(tag.split(key))-1
+    return count
+
+def countOccurences(result, keywords):
+    '''
+        This function creates and returns a dictionary containg the number matches for keyword in each post.
+        Input: result is a list of posts from search database query in search option. keywords is a list of words provided by user.
+        ReturnS: a dictionary object of the format{pid:Count_of_keyword_Matches}
+    '''
+    global connection, cursor
+    someDict = {}
+    for post in result:
+        count = 0
+        for key in keywords:
+            ptitle = post[1]
+            pbody = post[2]
+            if key != '':
+                count += len(ptitle.split(key))-1  # add count of the occurence of keyword in title of post
+                count += len(pbody.split(key))-1   # add count of the occurence of keyword in body of post
+                count += countKeyOccInTags(post[0], key)  # add count of the occurence of keyword in tags of post
+        someDict[post[0]] = count
+    return someDict
+    
 def orderSearchResults(result, keywords):
     '''
         This function sorts result based on kweyword matches in title, body and tags
@@ -382,7 +449,7 @@ def orderSearchResults(result, keywords):
     '''
     global connection, cursor
 
-    sortkey = countOccurences(result, keyword) # is a dictionary
+    sortkey = countOccurences(result, keywords) # is a dictionary
     start, end = [0,len(result)-1]
     helpQuickSort(result, sortkey, start, end)
 
@@ -408,31 +475,33 @@ def Searchdatabase(key):
     connection.commit()
     if result == []:
         return None
-    #orderSearchResults(result, keywords) # in place sorting of result based on key matches
+    orderSearchResults(result, keywords) # in place sorting of result based on key matches
     return result 
 
-def truncateString(string):
+def truncateString(size, string):
     '''
         This function truncates a string that is over 61 characters in length.
-        Input: string to be manipulated
-        Returns: a string
+        Input: string to be manipulated. size indicates the limit for string. 
+        Returns: a string of with length <= size 
     '''
-    if len(string) <= 61:
+    if len(string) <= size:
         return string
     else:
-        return string[0:59]+'...'
+        cut = size-3
+        return string[0:cut]+'...'
     
-def displaySearchResult(result, num):
+def displaySearchResult(result, num, key):
     '''
         This function prints to sreen the result from a user's search
-        Input: result is a list containg the posts to be displayed. num is an integer repersenting size of list to be displayee
+        Input: result is a list containing the posts to be displayed. num is an integer repersenting size of list to be displayed.
+               key is the input from user used to search.
         Return: None
     '''
     global connection, cursor
-    print('Search Results:')
-    print('+'+'-'*4+'+'+'-'*61+'+'+'-'*4+'+'+'-'*3+'+')
-    print('|{:^4}|{:^61}|{:^4}|{:^3}|'.format('Post', 'Post_Title', 'Vote', 'Ans'))
-    print('+'+'-'*4+'+'+'-'*61+'+'+'-'*4+'+'+'-'*3+'+')
+    print('Search Results: "{}"'.format(key))
+    print('+'+'-'*4+'+'+'-'*4+'+'+'-'*10+'+'+'-'*15+'+'+'-'*36+'+'+'-'*5+'+'+'-'*4+'+')
+    print('|{:^4}|{:^4}|{:^10}|{:^15}|{:^36}|{:^5}|{:^4}|'.format('Post','User','Date', 'Title', 'Body of Post', 'NVote', 'NAns'))
+    print('+'+'-'*4+'+'+'-'*4+'+'+'-'*10+'+'+'-'*15+'+'+'-'*36+'+'+'-'*5+'+'+'-'*4+'+')
     if num == 1:
         r = min(5, len(result))
     else:
@@ -440,12 +509,16 @@ def displaySearchResult(result, num):
     
     for p in range(r):
         pid = result[p][0]
-        ptitle = truncateString(result[p][1])
+        ptitle = truncateString(15,result[p][1])
+        pbody = truncateString(36,result[p][2])
         numVotes = str(result[p][3])
         numAns = str(result[p][4])
-        print('|{:^4}|{:^61}|{:^4}|{:^3}|'.format(pid, ptitle, numVotes, numAns))
-
-    print('+'+'-'*4+'+'+'-'*61+'+'+'-'*4+'+'+'-'*3+'+')
+        pdate = truncateString(10,result[p][5])
+        user = result[p][6]
+        if typeOfPost(pid) == 'answer':
+            numAns = 'NA'
+        print('|{:^4}|{:^4}|{:^10}|{:^15}|{:^36}|{:^5}|{:^4}|'.format(pid,user,pdate, ptitle, pbody, numVotes, numAns))
+    print('+'+'-'*4+'+'+'-'*4+'+'+'-'*10+'+'+'-'*15+'+'+'-'*36+'+'+'-'*5+'+'+'-'*4+'+'); print('')
 
 def displaySearchPageMenu(postOption):
     '''
@@ -483,7 +556,7 @@ def getSearchChoice(postOptions):
         if answer.lower() in alist:
             return answer.lower()
 
-def typeOfPost(choice):
+def typeOfPost(post):
     '''
         This function determines a if a post is an answer or question.
         Input: choice is a string containing pid of post
@@ -491,10 +564,10 @@ def typeOfPost(choice):
     '''
     global connection, cursor
     query = ''' SELECT pid FROM questions WHERE pid=?; '''
-    cursor.execute(query, (choice,))
+    cursor.execute(query, (post,))
     temp = cursor.fetchall()
     connection.commit()
-    if temp == []:
+    if len(temp)==0:
         return 'answer'
     else:
         return 'question'
@@ -518,7 +591,7 @@ def helpHandleSearch(key, numSearch, priviledge):
             if not endSearch:
                 result = Searchdatabase(key)
     if key != 'end' and result != None:
-        displaySearchResult(result, numSearch)
+        displaySearchResult(result, numSearch, key)
         displaySearchPageMenu(result)
     else:
         displaySearchPageMenu(None)
@@ -674,9 +747,19 @@ def searchPost(userID, priviledge):
         login = False; Exit = True
     elif choice == 'more':
         choice = helpHandleSearch(key, numSearch+1, priviledge)
-        #login, Exit = searchPost(userID, priviledge)
+        login, Exit = searchPost(userID, priviledge)
     return [login, Exit]
 
+def editPost(userID, privledge):
+    '''
+        This function enables a priviledged user to edit any post.
+        Input: userID is the primary key of the user. priviledge is a boolean indicating the administrative status of user.
+        Return: [login, exit] status
+    '''
+    global connection, cursor
+    login = True; Exit = False
+    # do statements
+    return login,Exit
 
 
     
