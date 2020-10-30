@@ -713,7 +713,7 @@ def postQuestion(userID, priviledge):
     elif choice == '5' or choice == 'vote':
         votePost(userID, postID)
     elif choice == '6' or choice == 'badge':
-        pass # give badge to userID
+        giveBadge(postID)
     elif choice == '7' or choice == 'tag':
         pass # get and add tag to post
     elif choice == '8' or choice == 'edit':
@@ -723,6 +723,50 @@ def postQuestion(userID, priviledge):
     else:
         login = False; Exit = True
     return [login, Exit]
+
+def promptForBadgeName():
+    '''
+    This inserts a user's vote in the votes table for the selected post
+    Input: userID is the primary key of the user, postID is the primary key of the selected post
+    Return: None
+    '''
+    global connection, cursor
+
+    query = ''' SELECT bname FROM badges; '''
+    cursor.execute(query)
+    allBnames = cursor.fetchall()
+    connection.commit()
+    print()
+    print('Available badge names:')
+    for bname in allBnames:
+        print('\t' + bname[0])
+    print()
+    chosenBname = input('Enter a valid badge name: ')
+    while (chosenBname,) not in allBnames:
+        chosenBname = input('The badge name you have chosen is not a valid badge name. Please re-enter: ')
+    print()
+    return chosenBname
+
+def giveBadge(postID):
+    '''
+    This inserts a user's vote in the votes table for the selected post
+    Input: userID is the primary key of the user, postID is the primary key of the selected post
+    Return: None
+    '''
+    global connection, cursor
+
+    currentDate = time.strftime("%Y-%m-%d")
+    bname = promptForBadgeName()
+    query = ''' SELECT poster FROM posts WHERE pid = ?; '''
+    cursor.execute(query, (postID,))
+    poster = cursor.fetchone()[0]
+    connection.commit()
+
+    query = ''' INSERT INTO ubadges VALUES (?, ?, ?); '''
+    cursor.execute(query, (poster, currentDate, bname))
+    connection.commit()
+
+    print("The badge " + bname + " has been given to user " + poster +"!")
 
 def generateVoteNumber(postID):
     '''
@@ -762,7 +806,6 @@ def votePost(userID, postID):
     print('Your vote has been cast!')
     print()
     print('-'*60)
-    
 
 def searchPost(userID, priviledge):
     '''
