@@ -726,9 +726,9 @@ def postQuestion(userID, priviledge):
 
 def promptForBadgeName():
     '''
-    This inserts a user's vote in the votes table for the selected post
-    Input: userID is the primary key of the user, postID is the primary key of the selected post
-    Return: None
+    This prompts the user for a badge name that is available in the database
+    Input: None
+    Return: the chosen badge name
     '''
     global connection, cursor
 
@@ -749,8 +749,8 @@ def promptForBadgeName():
 
 def giveBadge(postID):
     '''
-    This inserts a user's vote in the votes table for the selected post
-    Input: userID is the primary key of the user, postID is the primary key of the selected post
+    This inserts an entry in the ubadges table for the poster associated with postID
+    Input postID is the primary key of the selected post
     Return: None
     '''
     global connection, cursor
