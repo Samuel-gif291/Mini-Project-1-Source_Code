@@ -104,7 +104,6 @@ def provideValidPassword():
     '''
     complete = False
     while not complete:
-        #uid = input('Create a unique password (size must be at least one): ')
         uid = getpass.getpass('Create a unique password (size must be at least one): ')
         while len(uid)<= 0:
             uid = getpass.getpass('Create a unique password (size must be at least one): ')
@@ -380,11 +379,11 @@ def RandomizedPartition(alist, sortKey, start, end):
     alist[i+1], alist[end] = alist[end], alist[i+1]
     return i+1
 
-def countKeyOccInTags(postID, key):
+def keyInTags(postID, key):
     '''
         This function counts the number occurences of a keyword in a tag.
         Input: postID is a string representation of the post primary-key. Key is the string of specific keyword to be counted in tag.
-        Return: total count of occurences in a tag.
+        Return: boolean True if key is in tag and False otherwise.
     '''
     global connection, cursor
     query = ''' SELECT tag FROM posts JOIN tags ON tags.pid=posts.pid WHERE posts.pid=? '''
@@ -392,17 +391,16 @@ def countKeyOccInTags(postID, key):
     tags = cursor.fetchall()
     connection.commit()
     
-    count = 0
     if len(tags)>0:
         for t in tags:
-            tag = t[0] 
-            count += len(tag.split(key))-1
-    return count
+            if key in t:
+                return True
+    return False
 
 def countOccurences(result, keywords):
     '''
-        This function creates and returns a dictionary containg the number matches for keyword in each post.
-        Input: result is a list of posts from search database query in search option. keywords is a list of words provided by user.
+        This function creates and returns a dictionary containing the number matches for keywords in each post.
+        Input: result is a list of posts from search database query in search option. keywords is a list(size>1) of words provided by user.
         ReturnS: a dictionary object of the format{pid:Count_of_keyword_Matches}
     '''
     global connection, cursor
@@ -413,9 +411,8 @@ def countOccurences(result, keywords):
             ptitle = post[1]
             pbody = post[2]
             if key != '':
-                count += len(ptitle.split(key))-1  # add count of the occurence of keyword in title of post
-                count += len(pbody.split(key))-1   # add count of the occurence of keyword in body of post
-                count += countKeyOccInTags(post[0], key)  # add count of the occurence of keyword in tags of post
+                if key in ptitle or (key in pbody) or keyInTags(post[0], key):
+                    count += 1
         someDict[post[0]] = count
     return someDict
     
@@ -571,7 +568,7 @@ def displayMoreSearchResult(numSearch, result):
         
 
     
-def helpHandleSearch(key, result, numSearch, priviledge):
+def helpHandleSearch(key, result, numSearch, priviledge, userID):
     '''
         This function handles the search features of the application
         Input: numSearch is and integer to indicate limit of search and key contains the words provided by the user.
@@ -580,7 +577,6 @@ def helpHandleSearch(key, result, numSearch, priviledge):
     global connection, cursor
     login = True; Exit = False
     if numSearch == 1:
-        #result = Searchdatabase(key)
         if result == None:
             endSearch = False
             while result == None and not endSearch:
@@ -600,7 +596,7 @@ def helpHandleSearch(key, result, numSearch, priviledge):
     if choice == 'more':
         displayMoreSearchResult(numSearch+1, result)
         displaySearchPageMenu(result)
-        choice = helpHandleSearch(key, result, numSearch+1, priviledge)
+        choice = helpHandleSearch(key, result, numSearch+1, priviledge, userID)
     if choice not in ['logout', '0', 'x', 'back']:
         Type = typeOfPost(choice) # could be a question or answer returns string
         if Type == 'question':
@@ -743,7 +739,7 @@ def searchPost(userID, priviledge):
     print('Enter one or more key words seperated by a blank space to search for a post> ')
     key = getSearchKey()
     result = Searchdatabase(key)
-    choice = helpHandleSearch(key, result, numSearch, priviledge)
+    choice = helpHandleSearch(key, result, numSearch, priviledge, userID)
     
     if choice == 'back':
         login = True; Exit = False
