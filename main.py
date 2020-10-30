@@ -787,6 +787,22 @@ def generateVoteNumber(postID):
             vno = randint(0,999)
     return vno
 
+def userVotedAlready(userID, postID):
+    '''
+    This inserts a user's vote in the votes table for the selected post
+    Input: userID is the primary key of the user, postID is the primary key of the selected post
+    Return: None
+    '''
+    global connection, cursor
+
+    query = ''' SELECT * FROM votes WHERE uid = ? AND pid = ?; '''
+    cursor.execute(query, (userID, postID))
+    rows = cursor.fetchall()
+    connection.commit()
+    if len(rows) == 0:
+        return False
+    return True
+
 def votePost(userID, postID):
     '''
     This inserts a user's vote in the votes table for the selected post
@@ -795,10 +811,13 @@ def votePost(userID, postID):
     '''
     global connection, cursor
 
+    if userVotedAlready(userID, postID):
+        print("You have voted on this post already!")
+        print()
+        return None
+    
     currentDate = time.strftime("%Y-%m-%d")
     vno = generateVoteNumber(postID)
-    if vno == 0:
-        return None
     query = ''' INSERT into votes VALUES (?, ?, ?, ?); '''
     cursor.execute(query, (postID, vno, currentDate, userID))
     connection.commit()
