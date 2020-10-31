@@ -81,8 +81,7 @@ def searchForUser(userID, password):
         ID,pwd = [alist[0][0], alist[0][1]]
         if ID == userID and pwd == password:
             return True
-    return False
-        
+    return False     
 
 def provideValidUser():
     '''
@@ -129,7 +128,6 @@ def addUser(name, location, userID, password):
     query = ''' INSERT into users VALUES (?, ?, ?, ?, ?); '''
     cursor.execute(query, (userID, name, password, location, currentDate))
     connection.commit()
-    
     
 def getLoginInfo():
     '''
@@ -572,12 +570,10 @@ def printPost(pid):
         Input: pid is a string of post primary key
         Return: None
     '''
-    print(pid)
     global connection, cursor
     query = ''' SELECT * FROM posts WHERE lower(pid)=?'''
     cursor.execute(query, (pid,))
     post = cursor.fetchone()
-    print(post)
     connection.commit()
 
     print('-'*25+'Post Details'+'-'*24)
@@ -658,7 +654,7 @@ def getSelectedPostChoice(Type, priviledge):
     elif Type == 'question' and priviledge:
         blist = ['answer', '4', 'give badge', '6', 'tag', '7', 'edit', '8']
     elif Type == 'question':
-        blist = ['answer' '4']
+        blist = ['answer', '4']
     alist = blist + alist
     while True:
         choice = input('Select an option: ')
@@ -1028,8 +1024,8 @@ def main():
                 else:
                     login = False; Exit = True
         except Exception as e:
-            print('An error occured! Try again.')
             print(e)
+            #print('An error occured! Try again.')
         if Exit == False:
             Exit = getExitOption()
     exitProgram()
