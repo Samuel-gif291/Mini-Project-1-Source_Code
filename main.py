@@ -592,6 +592,11 @@ def handlePostChoice(priviledge, userID, postID):
     return choice
 
 def tag(postID):
+     '''
+        This function adds tags to a selected post
+        Input: postID is the primary key of the post.
+        Return: None
+     '''
      print("All tags on the post:")
      query = ''' SELECT tag FROM posts JOIN tags ON tags.pid=posts.pid WHERE posts.pid=? '''
      cursor.execute(query,(postID,))
@@ -621,6 +626,12 @@ def tag(postID):
      print(var1)
 
 def markAsAccepted(userID,postID):
+     '''
+        This function updates the accepted answer for a post.
+        Input: primary key of user and answer post
+        Return: None
+     '''
+
      query1 = ''' SELECT a.qid from answers a, questions q  where lower(a.qid) = q.pid and a.pid=?'''
      cursor.execute(query1, (postID,))
      qid = cursor.fetchone()
@@ -630,7 +641,8 @@ def markAsAccepted(userID,postID):
      var = cursor.fetchone()
      connection.commit()    
      if var[1] != 'null':
-         print("Do you want to change the accepted answer?")
+         print('-'*60); print("Do you want to change the accepted answer for the post below? ")
+         printPost(qid[0])
          text = input("Yes or NO: ")
          if text.lower() == 'yes':
             query3 = ''' UPDATE questions set theaid = ? where pid  = ?; '''
@@ -642,10 +654,15 @@ def markAsAccepted(userID,postID):
          cursor.execute(query3, (postID, qid[0]))
          connection.commit()
          print()
-         print("The answer has been marked as accepted")
+         print("The answer has been marked as accepted!")
          print()
 
 def rlinput(prompt, prefill=''):
+    '''
+        This function gets input for an update
+        Input: prompt is a string
+        Return: the edited changes from a user
+    '''
     readline.set_startup_hook(lambda: readline.insert_text(prefill))
     try:
         return input(prompt)
