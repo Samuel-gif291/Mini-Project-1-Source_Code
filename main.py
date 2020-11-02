@@ -354,7 +354,7 @@ def Searchdatabase(key):
     if not result:
         return None
     if len(keywords) > 1:
-        sorted(result, key=lambda p: ranking(p, keywords)) # sorting of result based on key matches(relevance)
+        result = sorted(result, reverse=True, key=lambda p: ranking(p, keywords)) # sorting of result based on key matches(relevance)
     return result
 
 def truncateString(size, string):
