@@ -1,1 +1,3 @@
-code is complete! Test cases listed in the report.pdf and in general any bugs. Code available on main.py of this branch.
+Samuel Iwelu          iwelu
+Vardan Saini          vardan1
+Arthur Chan           yungjen
