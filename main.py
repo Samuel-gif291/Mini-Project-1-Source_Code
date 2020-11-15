@@ -54,7 +54,7 @@ def searchForUser(userID, password):
         Input: userID is a string holding primary key for a user. password is string holding password for associated user_id.
         Return: boolean true if user_id is valid and false otherwise.
     """
-    query = ''' SELECT uid, pwd FROM users WHERE uid=? AND pwd=? '''
+    query = ''' SELECT lower(uid), pwd FROM users WHERE lower(uid)=? AND pwd=? '''
     cursor.execute(query, (userID, password))
     alist = cursor.fetchall()
     connection.commit()
@@ -780,7 +780,7 @@ def userVotedAlready(userID, postID):
     """
     global connection, cursor
 
-    query = ''' SELECT * FROM votes WHERE uid = ? AND pid = ?; '''
+    query = ''' SELECT * FROM votes WHERE lower(uid) = ? AND pid = ?; '''
     cursor.execute(query, (userID, postID))
     rows = cursor.fetchall()
     connection.commit()
